@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(nono why *)",
+      "Bash(nono profile guide)",
+      "Bash(nono profile validate *)",
+      "Bash(nono profile show *)"
+    ],
+    "deny": [
+      "Read(claude-safe.sh)",
+      "Write(claude-safe.sh)",
+      "Edit(claude-safe.sh)",
+
+      "Read(claude-settings-nono.json)",
+      "Write(claude-settings-nono.json)",
+      "Edit(claude-settings-nono.json)",
+
+      "Read(instrukcja.md)",
+      "Write(instrukcja.md)",
+      "Edit(instrukcja.md)",
+
+      "Read(nono-claude.jsonc)",
+      "Write(nono-claude.jsonc)",
+      "Edit(nono-claude.jsonc)",
+
+      "Read(.env)",
+      "Write(.env)",
+      "Edit(.env)",
+
+      "Bash(docker *)",
+      "Bash(sudo *)",
+      "Bash(sqlcmd *)",
+      "Read(~/.bash_history)",
+      "Read(~/.config/mssql.env)"
+    ],
+    "disableBypassPermissionsMode": "disable"
+  }
+}

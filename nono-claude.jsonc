@@ -1,0 +1,91 @@
+{
+  // ───────────────────────────────────────────────────────────────────────
+  //  nono-claude.jsonc — profil sandboxa nono dla Claude Code
+  //
+  //  Cel: Claude Code (i KAŻDY proces, który uruchomi: bash, git, npm...)
+  //  ma prawo zapisu wyłącznie w folderze projektu. Wszystko inne jest
+  //  odcięte na poziomie jądra Linuksa przez Landlock LSM — biała lista,
+  //  nieodwracalna po nałożeniu, dziedziczona przez procesy potomne.
+  //
+  //  Uruchamianie:  ./claude-safe.sh
+  //  (albo ręcznie: nono run --profile ./nono-claude.jsonc --allow-cwd -- claude)
+  //
+  //  Pełny opis schematu:  nono profile guide
+  //  Walidacja pliku:      nono profile validate ./nono-claude.jsonc
+  // ───────────────────────────────────────────────────────────────────────
+
+  // Baza: oficjalny profil Claude Code (pack "always-further/claude",
+  // podpisany Sigstore; nono zaproponuje instalację przy 1. uruchomieniu).
+  // Baza załatwia: RW do bieżącego katalogu, stan Claude (~/.claude,
+  // ~/.claude.json, ~/.local/share/claude), sieć do API Anthropic,
+  // logowanie OAuth, tryb interaktywny (TTY) i hooki diagnostyczne.
+  "extends": "claude-code",
+
+  "meta": {
+    "name": "claude-projekt",
+    "version": "1.0.0",
+    "description": "Claude Code zamknięty w folderze projektu (Landlock)"
+  },
+
+  // Folder, z którego startujesz (claude-safe.sh wchodzi do folderu projektu)
+  // = jedyny obszar roboczy z pełnym prawem odczytu i zapisu.
+  "workdir": { "access": "readwrite" },
+
+  // Grupy TYLKO-DO-ODCZYTU, żeby claude i typowe narzędzia wystartowały
+  // niezależnie od sposobu instalacji. Grupy z bazy i stąd są scalane
+  // (duplikaty znikają), więc dopisanie ich tu jest bezpieczne.
+  "groups": {
+    "include": [
+      "user_tools",       // ~/.local/bin — natywna instalacja claude
+      "node_runtime",     // ~/.nvm, ~/.npm, ~/.fnm — instalacja przez npm
+      "linux_temp_read"   // odczyt /tmp (wymagany przez część narzędzi)
+    ]
+  },
+
+  "filesystem": {
+    // Landlock działa jak biała lista: czego NIE ma tutaj ani w profilu
+    // bazowym, tego jądro po prostu nie udostępni. ~/.ssh, ~/.aws, ~/.gnupg,
+    // portfele, inne projekty, reszta katalogu domowego — wszystko odcięte
+    // bez dodatkowej konfiguracji.
+
+    // Dodatkowe ścieżki TYLKO DO ODCZYTU — odkomentuj, jeśli Claude ma
+    // korzystać z toolchainów zainstalowanych poza projektem:
+    "read": [
+      // "$HOME/.cargo/bin",                       // Rust
+      // "$HOME/go/bin",                           // Go
+      // "$HOME/.pyenv/bin", "$HOME/.pyenv/shims", // Python przez pyenv
+      // "$HOME/dokumentacja-referencyjna"         // np. wspólne dokumenty (RO)
+    ],
+
+    // Świadome wyjątki READ+WRITE poza projektem — domyślnie ŻADNYCH.
+    "allow": [],
+
+    // Odcięcie sekretów WEWNĄTRZ projektu (np. .env). Uwaga: sam Landlock
+    // nie potrafi zablokować dziecka dozwolonego katalogu, więc na Linuksie
+    // "deny" w obrębie projektu działa dopiero w trybie nadzorowanym —
+    // odkomentuj poniższe RAZEM z sekcją "security" na końcu pliku.
+    "deny": [
+      // "$WORKDIR/.env",
+      // "$WORKDIR/secrets"
+    ]
+  },
+
+  "network": {
+    // Sieć zgodnie z profilem bazowym (filtrowanie domen; API Anthropic
+    // dozwolone — bez tego Claude nie zadziała). Chcesz sesję całkiem
+    // offline? Uruchom z flagą --block-net (opis w INSTRUKCJA.md).
+
+    // Dodatkowe domeny pod potrzeby projektu — odkomentuj wedle uznania:
+    "allow_domain": [
+      // "github.com",                            // git push/pull po HTTPS
+      // "registry.npmjs.org",                    // npm install
+      // "pypi.org", "files.pythonhosted.org",    // pip install
+      // "crates.io", "static.crates.io", "index.crates.io"  // cargo
+    ]
+  }
+
+  // ── Opcjonalne dokręcenie (do pary z filesystem.deny powyżej) ──────────
+  // Tryb nadzorowany: dostępy spoza białej listy są przechwytywane przez
+  // seccomp-notify i sprawdzane z listą "deny", zanim cokolwiek się stanie.
+  // ,"security": { "capability_elevation": true }
+}
