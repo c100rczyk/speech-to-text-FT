@@ -10,10 +10,18 @@ smaller batch size but not too small.
 + To which layers apply LORA:
   + Attention-only LORA significantly underperforms MLP-only LoRA
 
-Data used for create various audio conversations (different voice probes):
-Mozilla Common Voice (Mozilla Data Collective)
-https://mozilladatacollective.com/datasets/cmu5wsxwp00e0nq07m8v0274j
 
 
 Whisper fine-tuning:
 https://huggingface.co/blog/fine-tune-whisper
+
+
+### DATA:
+
+1. Data used for create various audio conversations (different voice probes):
+Mozilla Common Voice (Mozilla Data Collective)
+https://mozilladatacollective.com/datasets/cmu5wsxwp00e0nq07m8v0274j
+
+2. Data (high quality general polish voices) can be used as part of data for fine-tuning model.
+Despite we want to prepare good medical model, we need to have high quality data 
+
