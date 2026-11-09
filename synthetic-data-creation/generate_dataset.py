@@ -6,7 +6,7 @@ Generates synthetic doctor–patient conversation recordings (Chatterbox Multili
   python generate_dataset.py conversations/ --voices voices/train/voices.csv --out tts_data/ [--limit 3]
 
 Conversation JSON -> voices cloned from voices.csv -> audio of each turn -> joined conversation.
-Next steps: quality_check.py (Whisper check) and export_dataset.py (16 kHz + metadata.jsonl).
+Next step: export_dataset.py (16 kHz + metadata.jsonl).
 
 Output for each conversation:
   tts_data/<id>/turns/t01.wav ...      each turn separately (24 kHz, as returned by the model)
@@ -255,7 +255,7 @@ def generate_conversation(conv: dict, voices: list[dict], tts, out_dir: Path, se
         "rtf": round((time.time() - t_start) / duration, 3),
         "speakers": {role: {"voice": v["id"], "gender": v["gender"], "age": v.get("age"),
                             "ref": v["path"], "params": params_of[role]} for role, v in voice_of.items()},
-        "meta": {k: conv[k] for k in ("specialization", "visit_type", "description") if k in conv},
+        "meta": {k: conv[k] for k in ("specialization", "visit_type", "description", "medical_terms") if k in conv},
         "turns": turns_meta,
     }
     (out_dir / "conversation.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
