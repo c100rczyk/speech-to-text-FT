@@ -1,0 +1,8 @@
+# Generator environment: a separate venv, Python 3.11 (the version Resemble AI tests with).
+# Chatterbox Multilingual V3 is only in the GitHub repository; release 0.1.7 on PyPI loads only V2.
+# The package pins torch==2.6.0 and transformers==5.2.0,
+# so STT training is best done in a separate environment.
+chatterbox-tts @ git+https://github.com/resemble-ai/chatterbox.git@5de7a54aa4e5e2baadb0182dde554908b48b85c2
+numpy
+scipy
+soundfile
