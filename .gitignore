@@ -1,8 +1,11 @@
 .idea
-evaluation
+evaluation/*
+!evaluation/evaluate.py
 synthetic-data-creation/conversations/*
 !synthetic-data-creation/conversations/.gitkeep
 synthetic-data-creation/tts_data/*
 !synthetic-data-creation/tts_data/.gitkeep
 synthetic-data-creation/voices/*
 !synthetic-data-creation/voices/.gitkeep
+synthetic-data-creation/hf_data/*
+!synthetic-data-creation/hf_data/.gitkeep
