@@ -18,10 +18,28 @@ https://huggingface.co/blog/fine-tune-whisper
 
 ### DATA:
 
+#### Training data
 1. Data used for create various audio conversations (different voice probes):
 Mozilla Common Voice (Mozilla Data Collective)
 https://mozilladatacollective.com/datasets/cmu5wsxwp00e0nq07m8v0274j
+   + This audio will also be used in fine-tuning. In fine tuning we dont want only synthetic data.
+   So real audio from this dataset after merging, will also be used.
+We split 
 
-2. Data (high quality general polish voices) can be used as part of data for fine-tuning model.
-Despite we want to prepare good medical model, we need to have high quality data 
+Part of conversations will be synthetic (prepared with Chatterbox - Test to speech model),
+with vocal timbres based on prepared voice probes from Mozilla Common Voice.
 
+2. VoxPopuli PL https://huggingface.co/datasets/facebook/voxpopuli License: CC0 (dane)
+  Contains European Parliament event recordings. (Polish 111 hours).
+
+#### walidation/test data
+Data (high quality general polish voices) that will be used in validation na test sets.
+
++ Multilingual LibriSpeech PL https://www.openslr.org/94/ License: CC BY 4.0 
+ Contains audiobooks (Polish 137 hours)
++ CLARIN-PL Studio https://clarin-pl.eu/dspace/items/cd3f6380-97e6-488f-9a91-c228df5c4ac6
+  License: CC BY 3.0 , Contains: speech read in the studio
++ CLARIN-PL Mobile https://clarin-pl.eu/dspace/items/92004353-58c3-49f0-97d9-66edf1cf1095
+  License: CC BY 3.0 , Contains: speech read by phone
++ ADMEDVOICE https://www.kaggle.com/datasets/karmarci/polish-medical-multi-source-corpus
+  License: CC BY 4.0 , Medical terms speech in Polish
