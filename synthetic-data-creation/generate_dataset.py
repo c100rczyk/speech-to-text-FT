@@ -3,15 +3,17 @@
 """
 Generates synthetic doctor–patient conversation recordings (Chatterbox Multilingual) for STT fine-tuning.
 
-  python generate_dataset.py conversations/ --voices voices/train/voices.csv --out tts_data/ [--limit 3]
+  python generate_dataset.py ../data/texts/train/ --voices ../data/voices/train/voices.csv \\
+      --out ../data/tts/train/ [--limit 3]
 
 Conversation JSON -> voices cloned from voices.csv -> audio of each turn -> joined conversation.
-Next step: export_dataset.py (16 kHz + metadata.jsonl).
+Next step: export_dataset.py (16 kHz + metadata.jsonl). Each split has its own texts, voices and output
+directory (train, dev, test-chatterbox); the layout of data/ is in the main README.
 
-Output for each conversation:
-  tts_data/<id>/turns/t01.wav ...      each turn separately (24 kHz, as returned by the model)
-  tts_data/<id>/conversation.wav       the whole conversation with pauses between turns
-  tts_data/<id>/conversation.json      voices, parameters, turn timings, label and the text read by TTS
+Output for each conversation, in --out:
+  <id>/turns/t01.wav ...      each turn separately (24 kHz, as returned by the model)
+  <id>/conversation.wav       the whole conversation with pauses between turns
+  <id>/conversation.json      voices, parameters, turn timings, label and the text read by TTS
 """
 from __future__ import annotations
 
@@ -291,8 +293,8 @@ def cmd_generate(args) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("conversations", help="directory with *.json conversations, or a single file")
-    ap.add_argument("--voices", required=True, help="voices/<split>/voices.csv")
-    ap.add_argument("--out", required=True)
+    ap.add_argument("--voices", required=True, help="data/voices/<split>/voices.csv")
+    ap.add_argument("--out", required=True, help="e.g. data/tts/train/ (one directory per conversation is written)")
     ap.add_argument("--limit", type=int, help="only the first N conversations")
     ap.add_argument("--only", nargs="+", help="only conversations whose file name contains this text, e.g. train_014")
     ap.add_argument("--backend", choices=["chatterbox", "dummy"], default="chatterbox")
