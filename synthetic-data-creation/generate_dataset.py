@@ -94,13 +94,17 @@ def load_voices(path: Path) -> list[dict]:
 
 
 def pick_voices(conv: dict, voices: list[dict], rng: np.random.Generator) -> dict[str, dict]:
-    """Each speaker gets a different voice of the same gender, from the same age group where possible."""
+    """Each speaker gets a different voice of the same gender, from the same age group where possible.
+
+    A voice with no age in voices.csv fits every age group.
+    """
     chosen: dict[str, dict] = {}
     for role, info in conv["speakers"].items():
         gender = {"F": "K"}.get(info.get("gender"), info.get("gender"))
+        age = age_group(info.get("age"))
         free = [v for v in voices if v["id"] not in {c["id"] for c in chosen.values()}]
         same_gender = [v for v in free if v["gender"] == gender] or free
-        same_age = [v for v in same_gender if v.get("age") == age_group(info.get("age"))]
+        same_age = [v for v in same_gender if age and v.get("age") in (age, "", None)]
         pool = same_age or same_gender
         chosen[role] = pool[rng.integers(len(pool))]
     return chosen
