@@ -10,14 +10,14 @@ pauses, normalizes loudness and rejects recordings with a low estimated SNR.
 
 Modes:
   1) Own recordings (not implemented yet) – each subdirectory is one person:
-       python prepare_voices.py --input real_voices/ --out voices/ [--speakers-csv speakers.csv]
+       python prepare_voices.py --input real_voices/ --out ../data/voices/ [--speakers-csv speakers.csv]
      speakers.csv: speaker,gender,age   (gender K/M, age dziecko/mlody/dorosly/senior)
      Without the CSV, gender is taken from a K_ / M_ prefix in the directory name (e.g. K_anna, M_jan).
 
   2) Mozilla Common Voice (Polish, CC0) – the language directory of an extracted release, containing
      validated.tsv, dev.tsv, test.tsv and clips/:
-       python prepare_voices.py --common-voice cv-corpus-XX/pl --out voices/ --max-speakers 200
-       python prepare_voices.py --common-voice cv-corpus-XX/pl --out voices/ --include-cv-splits dev test
+       python prepare_voices.py --common-voice cv-corpus-XX/pl --out ../data/voices/ --max-speakers 200
+       python prepare_voices.py --common-voice cv-corpus-XX/pl --out ../data/voices/ --include-cv-splits dev test
      Skips people who reported the age "teens" at least once and people with no gender or age in the
      metadata. By default it also skips speakers from dev.tsv/test.tsv, so those Common Voice splits stay
      clean for regression checks. --include-cv-splits takes their speakers too (dev, test or both) – most
@@ -25,10 +25,10 @@ Modes:
      to evaluate the STT model (use e.g. FLEURS instead). Picks voices evenly between K and M, and within
      each gender takes turns between age groups.
 
-     Output – one folder per voice split, each with its own voices.csv:
-       voices/train/  voices for the training conversations (conversations/)
-       voices/dev/    voices for the synthetic validation set checked during training
-       voices/test/   voices for the evaluation conversations (evaluation/)
+     Output in data/ – one folder per voice split, each with its own voices.csv:
+       voices/train/  voices for the training conversations (data/texts/train/)
+       voices/dev/    voices for the synthetic validation set checked during training (data/texts/dev/)
+       voices/test/   voices for the test conversations (data/eval/texts/)
        voices/common_voice_sources.csv – every voice with its split, client_id, Common Voice split and
                       the recordings used (later Common Voice releases may assign speakers differently)
        voices/run_info.json – how the folder was made: the command, the dev/test fractions, the other
