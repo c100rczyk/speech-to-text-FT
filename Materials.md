@@ -43,3 +43,34 @@ Data (high quality general polish voices) that will be used in validation na tes
   License: CC BY 3.0 , Contains: speech read by phone
 + ADMEDVOICE https://www.kaggle.com/datasets/karmarci/polish-medical-multi-source-corpus
   License: CC BY 4.0 , Medical terms speech in Polish
+
+
+### Models:
+
+#### **Speech to text models:**
+
+For text to speech stuff, needed for create synthetic domain data for 
+fine tuning whisper we need to create this data.
+1. The number one choice is Chatterbox https://huggingface.co/ResembleAI/chatterbox
+With this model we create training audio data, based on prepared text conversations.
+
+2. Next model that can be useful for create synthetic audio for text
+or evaluation, will be probably use different model tts because fine-tuned
+whisper, can be overfitted to chatterbox characteristics of generated voices.
+This could be for example: https://huggingface.co/rhasspy/piper-voices
+
+#### **Text to speech models:** 
+
+Main model to fine-tune will be whisper, because of his good general
+quality. This is state-of-the-art open source model. https://huggingface.co/openai/whisper-large-v3.
+
+
+#### **Audio-text embedding model**
+This model will be prepared for help with find the proper world from set of few propositions.
+After the world has been spoken, and it is potentially the medical term, we get audio of this
+word, create emebedding from this, find most similar embeddings of medical terms.
+Thanks to this, user, can change the wrong written word, with set of fast to replace most similar
+to the real one, propositions.
+
+
+
