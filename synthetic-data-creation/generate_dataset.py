@@ -162,7 +162,23 @@ class ChatterboxTTS:
 
     def __init__(self, device: str, t3_model: str):
         import torch
+        import chatterbox.mtl_tts as mtl
         from chatterbox.mtl_tts import ChatterboxMultilingualTTS
+        from chatterbox.models.s3tokenizer import SPEECH_VOCAB_SIZE
+
+        # T3 sometimes samples a speech id that S3Gen has no embedding for, which ends in a CUDA
+        # "device-side assert". The English tts.py drops such ids; mtl_tts.py does not, so do it here.
+        drop_sos_eos = mtl.drop_invalid_tokens
+
+        def drop_invalid_tokens(x):
+            x = drop_sos_eos(x)
+            bad = x >= SPEECH_VOCAB_SIZE
+            if bad.any():
+                print(f"  WARNING: dropped {int(bad.sum())} out-of-range speech token(s) in the turn below",
+                      flush=True)
+            return x[~bad]
+
+        mtl.drop_invalid_tokens = drop_invalid_tokens
 
         self.torch = torch
         # Older releases (e.g. 0.1.x from PyPI) only have V2 and do not accept the t3_model parameter.
@@ -179,7 +195,10 @@ class ChatterboxTTS:
 
     def synth(self, text: str, voice: dict, params: dict, seed: int) -> np.ndarray:
         if voice["id"] not in self._conds:
-            self.model.prepare_conditionals(voice["path"], exaggeration=params["exaggeration"])
+            # Without no_grad the speaker embedding keeps its autograd graph (about 250 MB of GPU memory),
+            # and the cache below would hold one per voice until CUDA runs out of memory.
+            with self.torch.no_grad():
+                self.model.prepare_conditionals(voice["path"], exaggeration=params["exaggeration"])
             self._conds[voice["id"]] = self.model.conds
         self.model.conds = self._conds[voice["id"]]
         self.torch.manual_seed(seed)
