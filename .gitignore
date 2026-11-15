@@ -1,11 +1,11 @@
 .idea
-evaluation/*
-!evaluation/evaluate.py
-synthetic-data-creation/conversations/*
-!synthetic-data-creation/conversations/.gitkeep
-synthetic-data-creation/tts_data/*
-!synthetic-data-creation/tts_data/.gitkeep
-synthetic-data-creation/voices/*
-!synthetic-data-creation/voices/.gitkeep
-synthetic-data-creation/hf_data/*
-!synthetic-data-creation/hf_data/.gitkeep
+__pycache__/
+# All data lives in data/ and stays out of git; only the empty folders are kept (.gitkeep). The test sets hold
+# other people's recordings that must not be re-hosted, and the evaluation reports quote the reference texts.
+data/**
+!data/**/
+!data/**/.gitkeep
+!data/training/README.md
+evaluation/results/
+# Checkpoints written during fine-tuning (several GB each).
+ft-stt-pipeline/checkpoints/
