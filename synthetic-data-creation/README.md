@@ -128,6 +128,9 @@ data/tts/train/<id>/
 - Finished conversations are skipped, so an interrupted run can be started again (`--overwrite` regenerates).
 - `forcing EOS token` warnings are not errors, but such turns may be cut off or have extra syllables appended.
   Listen to them.
+- `dropped N out-of-range speech token(s)` means the model sampled a token the vocoder does not know. The
+  script removes it (about 40 ms of audio each) instead of crashing with a CUDA `device-side assert`. Listen
+  to the turn printed right after the warning.
 
 ## Export
 
