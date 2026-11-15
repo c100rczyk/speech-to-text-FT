@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Generates synthetic doctor–patient conversation recordings (Chatterbox Multilingual) for STT fine-tuning.
+Generates synthetic conversation recordings (Chatterbox Multilingual) for STT fine-tuning.
 
   python generate_dataset.py ../data/texts/train/ --voices ../data/voices/train/voices.csv \\
       --out ../data/tts/train/ [--limit 3]
@@ -63,7 +63,7 @@ def tts_text(turn: dict) -> str:
 
 def split_chunks(text: str, max_chars: int = MAX_CHUNK_CHARS) -> list[str]:
     """Splits text into sentences and joins them into chunks ≤ max_chars.
-    Does not split at an ellipsis ("yyy... bisoprolol")."""
+    Does not split at an ellipsis ("yyy... intercyza")."""
     sentences = [s for s in re.split(r"(?<=[^.][.!?])\s+", text) if s]
     chunks: list[str] = []
     for s in sentences:
@@ -261,7 +261,7 @@ def generate_conversation(conv: dict, voices: list[dict], tts, out_dir: Path, se
         "rtf": round((time.time() - t_start) / duration, 3),
         "speakers": {role: {"voice": v["id"], "gender": v["gender"], "age": v.get("age"),
                             "ref": v["path"], "params": params_of[role]} for role, v in voice_of.items()},
-        "meta": {k: conv[k] for k in ("specialization", "visit_type", "description", "medical_terms") if k in conv},
+        "meta": {k: conv[k] for k in ("subdomain", "conversation_type", "description", "terms") if k in conv},
         "turns": turns_meta,
     }
     (out_dir / "conversation.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
