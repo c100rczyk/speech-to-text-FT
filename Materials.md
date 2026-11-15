@@ -41,8 +41,6 @@ Data (high quality general polish voices) that will be used in validation na tes
   License: CC BY 3.0 , Contains: speech read in the studio
 + CLARIN-PL Mobile https://clarin-pl.eu/dspace/items/92004353-58c3-49f0-97d9-66edf1cf1095
   License: CC BY 3.0 , Contains: speech read by phone
-+ ADMEDVOICE https://www.kaggle.com/datasets/karmarci/polish-medical-multi-source-corpus
-  License: CC BY 4.0 , Medical terms speech in Polish
 
 
 ### Models:
@@ -67,8 +65,8 @@ quality. This is state-of-the-art open source model. https://huggingface.co/open
 
 #### **Audio-text embedding model**
 This model will be prepared for help with find the proper world from set of few propositions.
-After the world has been spoken, and it is potentially the medical term, we get audio of this
-word, create emebedding from this, find most similar embeddings of medical terms.
+After the world has been spoken, and it is potentially a domain term, we get audio of this
+word, create emebedding from this, find most similar embeddings of the domain terms.
 Thanks to this, user, can change the wrong written word, with set of fast to replace most similar
 to the real one, propositions.
 
