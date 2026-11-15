@@ -10,7 +10,7 @@ Export for training: every turn -> 16 kHz wav + metadata.jsonl with the "text" l
 One run writes one split. Test audio is not exported here: evaluation/build_tts_set.py builds it into a test set.
 
 To drop a bad conversation, delete its directory from data/tts/<split>/ before exporting. Only turns longer than
---max-s (Whisper's 30 s window) are skipped. "medical_terms" lists the conversation's terms that occur in the
+--max-s (Whisper's 30 s window) are skipped. "terms" lists the conversation's key terms that occur in the
 turn's text (for evaluation/evaluate.py).
 
 Loading: datasets.load_dataset("audiofolder", data_dir="data/training")
@@ -33,7 +33,7 @@ def cmd_export(args) -> None:
     for d in conversation_dirs(args.data_dirs):   # every <data dir>/<id>/ that has a conversation.json
         meta = json.loads((d / "conversation.json").read_text(encoding="utf-8"))
         # copied from the conversation JSON by generate_dataset.py; empty for conversations generated before that
-        terms = meta.get("meta", {}).get("medical_terms", [])
+        terms = meta.get("meta", {}).get("terms", [])
         for t in meta["turns"]:
             # Chatterbox writes 24 kHz, Whisper (its feature extractor) expects 16 kHz
             x16 = to_16k(*read_wav(d / t["file"]))
@@ -48,9 +48,9 @@ def cmd_export(args) -> None:
             # learns (the written form, not tts_text); the other columns are for evaluation and analysis
             rows.append({"file_name": name, "text": t["text"], "conversation": meta["id"], "turn": t["turn"],
                          "speaker": t["speaker"], "voice": t["voice"], "duration": round(len(x16) / 16000, 2),
-                         "specialization": meta.get("meta", {}).get("specialization"),
+                         "subdomain": meta.get("meta", {}).get("subdomain"),
                          # only the terms said in this turn; evaluate.py counts how many the model gets right
-                         "medical_terms": [m for m in terms if m.lower() in t["text"].lower()]})
+                         "terms": [m for m in terms if m.lower() in t["text"].lower()]})
 
     # Remove files from a previous export that are no longer in the metadata (e.g. a deleted conversation),
     # so the directory holds exactly what metadata.jsonl describes
