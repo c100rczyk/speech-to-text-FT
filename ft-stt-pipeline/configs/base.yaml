@@ -1,0 +1,29 @@
+# Base configuration of a training run. train.py always reads this file first; an experiment file
+# (configs/experiments/*.yaml) repeats only the settings it changes.
+
+model: openai/whisper-small           # the model that is fine-tuned
+seed: 42
+
+# --- How long and how fast the model learns ---
+num_train_epochs: 3                   # one epoch = every training clip seen once
+per_device_train_batch_size: 2        # clips per step; lower it when the GPU runs out of memory
+learning_rate: 1.0e-5
+warmup_steps: 0.1                     # over the first X% of steps the learning rate grows from 0 to its value,
+lr_scheduler_type: linear
+
+# --- Evaluation on the validation split ---
+eval_strategy: epoch
+per_device_eval_batch_size: 8
+predict_with_generate: true           # the model writes whole transcriptions; compute_metrics needs text
+generation_max_length: 225            # longest transcription it may write, in tokens
+
+# --- Checkpoints ---
+save_strategy: epoch                  # same moment as evaluation, so every checkpoint has its WER
+save_total_limit: 2
+load_best_model_at_end: true          # after training go back to the checkpoint with the lowest WER
+metric_for_best_model: wer
+greater_is_better: false
+
+# --- Logging ---
+logging_steps: 20                     # training loss is shown every 20 steps
+report_to: none                       # no experiment tracker yet
