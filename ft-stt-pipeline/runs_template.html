@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Training runs</title>
+<!--
+TEMPLATE of the page that compares training runs. summarize_runs.py puts the numbers of the runs into the
+"data" script element below and writes the result to runs/summary.html. This file is not edited by hand and
+shows no runs when it is opened as it is. The page is self-contained: no network, no build step, it opens
+from disk in any browser and prints to PDF. Colors and tables follow evaluation/results_template.html.
+
+The data (summarize_runs.py describes where every number comes from):
+  generated, runs_dir   when and from which directory the page was made
+  baseline              name of the run the others are compared with; null when there is no such run
+  runs[]                name, model, status ("finished", "unfinished" or "failed"),
+                        settings_saved (false: the settings were read from configs/, not from the run),
+                        changed (the settings that differ from configs/base.yaml, each as "key: value"),
+                        epochs_done, epochs_planned, best_epoch (the evaluation with the lowest WER),
+                        evaluations[]: epoch, step, train_loss, eval_loss, wer, cer
+                        train[]: [epoch, training loss] at every logging point
+Units: every rate is in percent (26.6 means 26.6%), every difference in percentage points. A value that is
+missing is null.
+-->
+<style>
+  :root {
+    color-scheme: light;
+    --plane: #f9f9f7; --surface: #fcfcfb; --border: rgba(11, 11, 11, .10);
+    --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781; --grid: #e1e0d9; --axis: #c3c2b7;
+    /* One color per run, in this order. A ninth run is drawn in gray: a repeated color would name two runs. */
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+    --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  }
+  @media screen and (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --plane: #0d0d0d; --surface: #1a1a19; --border: rgba(255, 255, 255, .10);
+      --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781; --grid: #2c2c2a; --axis: #383835;
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+      --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--plane); color: var(--ink);
+         font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1080px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 28px; line-height: 1.2; font-weight: 650; margin: 0 0 8px; }
+  h2 { font-size: 20px; line-height: 1.3; margin: 0 0 8px; padding-top: 20px; border-top: 1px solid var(--grid); }
+  section { margin-top: 44px; }
+  p, ul { max-width: 78ch; }
+  li { margin-bottom: 6px; }
+  .note { color: var(--ink-2); font-size: 14px; margin: 0 0 12px; }
+  .meta { display: flex; flex-wrap: wrap; gap: 4px 20px; color: var(--ink-2); font-size: 14px; }
+  code { font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+  .scroll { overflow-x: auto; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  th, td { padding: 9px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--grid); }
+  tbody tr:last-child td { border-bottom: 0; }
+  th { font-size: 12px; font-weight: 600; color: var(--ink-2); vertical-align: bottom; }
+  .num { text-align: right; white-space: nowrap; }
+  .name, td code { white-space: nowrap; }
+  .tag { color: var(--muted); font-size: 12px; font-weight: 400; }
+  .name .tag { margin-left: 6px; }
+  .first td { border-top: 1px solid var(--axis); }     /* the first evaluation of a run, in the table of all of them */
+
+  /* The key of a run: a short stroke in its color, with a dot where the line it stands for has dots. */
+  .key { display: inline-block; position: relative; width: 16px; height: 2px; border-radius: 1px;
+         margin-right: 7px; vertical-align: middle; background: var(--c); }
+  .key.dotted::after { content: ""; position: absolute; left: 4px; top: -3px; width: 8px; height: 8px;
+                       border-radius: 50%; background: var(--c); }
+
+  .chart { padding: 16px 16px 8px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 20px; font-size: 13px; color: var(--ink-2); margin-bottom: 8px; }
+  .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+  .panels > * { min-width: 0; }          /* a panel takes the width of its column, not of the chart inside it */
+  .panels .title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  svg { display: block; width: 100%; height: auto; }
+  svg:focus-visible { outline: 2px solid var(--s1); outline-offset: 2px; border-radius: 4px; }
+  svg text { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  svg .end { font-size: 12px; fill: var(--ink-2); }
+  svg .gridline { stroke: var(--grid); stroke-width: 1; }
+  svg .baseline, svg .cross { stroke: var(--axis); stroke-width: 1; }
+  svg .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  svg .dot { stroke: var(--surface); stroke-width: 2; }
+  svg .ring { fill: none; stroke-width: 1.5; }
+
+  #tip { position: fixed; z-index: 10; max-width: 320px; padding: 7px 10px; border-radius: 6px; font-size: 12.5px;
+         background: var(--ink); color: var(--plane); pointer-events: none; }
+  #tip .tip-title { font-weight: 600; margin-bottom: 2px; }
+  @media print { main { padding: 0; } section { break-inside: avoid; } #tip { display: none; } }
+</style>
+</head>
+<body>
+
+<script type="application/json" id="data">__DATA__</script>
+
+<main>
+  <header>
+    <h1>Training runs</h1>
+    <div class="meta" id="meta"></div>
+    <p class="note" id="empty" hidden>This is the template without numbers. Run <code>python summarize_runs.py</code>
+      and open <code>runs/summary.html</code>.</p>
+  </header>
+
+  <section id="runs">
+    <h2>Runs</h2>
+    <p class="note">One row per folder in the runs directory. Best WER ↓ is the lowest word error rate the run
+      reached on the validation split; the columns after it are from the same epoch. With
+      <code>load_best_model_at_end</code> and <code>metric_for_best_model: wer</code> the model of that epoch
+      is the one saved to <code>final/</code>. <span id="baseline-note"></span></p>
+  </section>
+
+  <section id="wer">
+    <h2>WER on the validation split</h2>
+    <p class="note">WER ↓ after every evaluation. A ring marks the lowest WER of a run. The axis does not
+      start at zero, so that the small differences between the runs can be read.</p>
+    <div class="card chart"><div class="legend" id="wer-legend"></div><div id="wer-plot"></div></div>
+  </section>
+
+  <section id="loss">
+    <h2>Training and validation loss</h2>
+    <p class="note">One panel per run, all on the same axes. A training loss that keeps falling while the
+      validation loss rises means the model is memorizing the training clips (overfitting).</p>
+    <div class="legend">
+      <span><i class="key" style="--c:var(--muted)"></i>training loss, at every logging point</span>
+      <span><i class="key dotted" style="--c:var(--ink-2)"></i>validation loss, in the color of the run</span>
+    </div>
+    <div class="panels" id="loss-panels"></div>
+  </section>
+
+  <section id="evaluations">
+    <h2>Every evaluation</h2>
+    <p class="note">The numbers behind the charts. Training loss is the mean since the evaluation before. The
+      lowest WER of each run is in bold.</p>
+  </section>
+
+  <section id="reading">
+    <h2>Before drawing conclusions</h2>
+    <ul id="reading-list">
+      <li>These are validation numbers. The best epoch of a run is chosen on the validation split and its WER
+        is measured on that same split, so it is a little too good, and the split is synthetic. Compare the
+        final models on the test sets: in <code>evaluation/</code> run
+        <code>python evaluate.py --out results/&lt;run&gt; --model ../ft-stt-pipeline/runs/&lt;run&gt;/final</code>
+        for every run and once for the model before fine-tuning, then <code>python compare.py</code> on the results.</li>
+      <li>The page has no confidence intervals; <code>compare.py</code> gives them. A difference of a few
+        tenths of a percentage point between two runs can be chance.</li>
+      <li>Training loss is the loss of one batch. With <code>gradient_accumulation_steps</code> the trainer
+        logs it summed over the batches of one update; it is divided back here.</li>
+    </ul>
+  </section>
+</main>
+
+<div id="tip" role="tooltip" hidden></div>
+
+<script>
+"use strict";
+const text = document.getElementById("data").textContent.trim();
+const D = text.startsWith("{") ? JSON.parse(text) : {runs: []};     // not JSON: the template without numbers
+const SLOTS = 8;                                                    // run colors defined in :root
+
+// --- Helpers. Every string from the data goes in as a text node, never as HTML. --------------------
+const $ = id => document.getElementById(id);
+function fill(e, attrs, kids) {
+  for (const [k, v] of Object.entries(attrs || {})) if (v != null && v !== false) e.setAttribute(k, v);
+  for (const kid of kids.flat(3)) if (kid != null && kid !== false) e.append(kid);
+  return e;
+}
+const el = (tag, attrs, ...kids) => fill(document.createElement(tag), attrs, kids);
+const svg = (tag, attrs, ...kids) => fill(document.createElementNS("http://www.w3.org/2000/svg", tag), attrs, kids);
+const th = (kids, cls) => el("th", {class: cls, scope: "col"}, kids);
+const td = (kids, cls) => el("td", {class: cls}, kids);
+const code = text => el("code", null, text);
+const table = (head, rows) => el("div", {class: "card scroll"}, el("table", null,
+  el("thead", null, el("tr", null, head)), el("tbody", null, rows)));
+const has = x => x != null;
+const pct = x => has(x) ? x.toFixed(2) + "%" : "—";
+const loss = x => has(x) ? x.toFixed(3) : "—";
+const plain = x => has(x) ? String(+x.toFixed(2)) : "—";             // 3 -> "3", 2.5 -> "2.5"
+const signed = x => (x < 0 ? "−" : "+") + Math.abs(x).toFixed(2);
+const key = (color, dotted) => el("i", {class: dotted ? "key dotted" : "key", style: `--c:${color}`});
+const best = run => run.evaluations.find(e => e.epoch === run.best_epoch);
+
+D.runs.forEach((run, i) => { run.color = i < SLOTS ? `var(--s${i + 1})` : "var(--muted)"; });
+
+// --- Table of the runs ----------------------------------------------------------------------------
+function runsTable() {
+  const base = D.runs.find(run => run.name === D.baseline), baseBest = base && best(base);
+  const scored = D.runs.map(best).filter(Boolean);
+  const lowest = scored.length > 1 ? Math.min(...scored.map(e => e.wer)) : null;     // printed in bold
+  const head = [th("Run"), th("Differs from base.yaml"), th("Epochs", "num"), th("Best WER ↓", "num"), th("In epoch", "num"),
+                baseBest && th(`Against ${D.baseline}`, "num"), th("CER ↓", "num"), th("Validation loss", "num"),
+                th("Training loss", "num"), th("Status")];
+  const rows = D.runs.map(run => {
+    const b = best(run) || {};
+    return el("tr", null,
+      td([key(run.color, true), code(run.name), run === base && el("span", {class: "tag"}, "baseline")], "name"),
+      td([run.changed.length ? run.changed.map(change => el("div", null, code(change))) : "—",
+          !run.settings_saved && el("div", {class: "tag"}, "settings read from configs/")]),
+      td(`${plain(run.epochs_done)} of ${plain(run.epochs_planned)}`, "num"),
+      td(has(b.wer) && b.wer === lowest ? el("b", null, pct(b.wer)) : pct(b.wer), "num"),
+      td(plain(b.epoch), "num"),
+      baseBest && td(run === base || !has(b.wer) ? "—" : `${signed(b.wer - baseBest.wer)} pp`, "num"),
+      td(pct(b.cer), "num"), td(loss(b.eval_loss), "num"), td(loss(b.train_loss), "num"),
+      td(run.status === "finished" ? "finished" : `⚠ ${run.status}`, "name"));
+  });
+  $("runs").append(table(head, rows));
+  $("baseline-note").textContent = baseBest ? "" :
+    "There is no run named base yet: train base.yaml as it is (python train.py) to see how far each experiment is from it.";
+}
+
+// --- Line chart -----------------------------------------------------------------------------------
+function ticks(low, high) {              // round values from at or below `low` to at or above `high`
+  if (high - low < 1e-9) { low -= 0.5; high += 0.5; }
+  const rough = (high - low) / 4, power = 10 ** Math.floor(Math.log10(rough));
+  const step = [1, 2, 2.5, 5, 10].find(m => m * power >= rough) * power;
+  const out = [];
+  for (let i = Math.floor(low / step + 1e-9); (i - 1) * step < high - 1e-9; i++) out.push(+(i * step).toFixed(10));
+  return out;
+}
+
+function tooltip(title, rows, x, y) {    // one box for all charts; x, y: where on the screen it points
+  const tip = $("tip");
+  tip.replaceChildren(el("div", {class: "tip-title"}, title),
+    ...rows.map(row => el("div", null, key(row.color, row.dotted), el("b", null, row.value), ` ${row.name}`)));
+  tip.hidden = false;
+  tip.style.left = `${Math.max(8, Math.min(x + 14, innerWidth - tip.offsetWidth - 8))}px`;
+  tip.style.top = `${y + 14 + tip.offsetHeight > innerHeight ? Math.max(8, y - tip.offsetHeight - 10) : y + 14}px`;
+}
+
+// options: series [{name, color, points [[x, y]], dots, ring (x of the point to mark)}], height, label,
+// tick and value (how a y is printed on the axis and in the tooltip), title (x -> heading of the tooltip),
+// optional: x and y ([low, high]; default: the range of the points), labels (name every line at its end),
+// rows (x -> rows of the tooltip; default: every series that has a point at x).
+// The pointer and the arrow keys move between the x positions of the dotted series.
+function lineChart(host, options) {
+  const points = options.series.flatMap(s => s.points);
+  if (!points.length) return;
+  let [x0, x1] = options.x || [Math.min(...points.map(p => p[0])), Math.max(...points.map(p => p[0]))];
+  if (x1 === x0) { x0 -= 0.5; x1 += 0.5; }
+  const yTicks = ticks(...(options.y || [Math.min(...points.map(p => p[1])), Math.max(...points.map(p => p[1]))]));
+  const y0 = yTicks[0], y1 = yTicks[yTicks.length - 1];
+  const stops = [...new Set(options.series.filter(s => s.dots).flatMap(s => s.points.map(p => p[0])))].sort((a, b) => a - b);
+  const rows = options.rows || (x => options.series.map(s => [s, s.points.find(p => p[0] === x)]).filter(pair => pair[1])
+    .map(([s, p]) => ({color: s.color, dotted: s.dots, value: options.value(p[1]), name: s.name})));
+  let at = null;                         // index in `stops` of the position shown now
+  let width = null;                      // width of `host` the chart was last drawn for
+
+  function draw() {
+    width = host.clientWidth;
+    const W = Math.max(width, 240), H = options.height;
+    const labels = options.labels && W >= 560;       // on a narrow screen the legend alone names the lines
+    const longest = Math.max(...options.series.map(s => s.name.length));
+    const m = {left: 50, right: labels ? Math.min(200, 22 + 7 * longest) : 16, top: 14, bottom: 40};
+    const sx = x => m.left + (x - x0) / (x1 - x0) * (W - m.left - m.right);
+    const sy = y => m.top + (y1 - y) / (y1 - y0) * (H - m.top - m.bottom);
+    const root = svg("svg", {viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": options.label, tabindex: stops.length ? 0 : null});
+
+    for (const y of yTicks) {
+      root.append(svg("line", {class: y === y0 ? "baseline" : "gridline", x1: m.left, x2: W - m.right, y1: sy(y), y2: sy(y)}),
+                  svg("text", {x: m.left - 8, y: sy(y) + 4, "text-anchor": "end"}, options.tick(y)));
+    }
+    const step = Math.max(1, Math.ceil((x1 - x0) / 10));
+    for (let x = Math.ceil(x0); x <= x1; x += step) {
+      root.append(svg("text", {x: sx(x), y: H - m.bottom + 16, "text-anchor": "middle"}, String(x)));
+    }
+    root.append(svg("text", {x: (m.left + W - m.right) / 2, y: H - 6, "text-anchor": "middle"}, "epoch"));
+
+    const cross = svg("line", {class: "cross", y1: m.top, y2: H - m.bottom, visibility: "hidden"});
+    root.append(cross);
+
+    for (const s of options.series) {
+      root.append(svg("path", {class: "line", stroke: s.color, "stroke-width": s.dots ? null : 1.5,
+                               d: s.points.map((p, i) => `${i ? "L" : "M"}${sx(p[0]).toFixed(1)} ${sy(p[1]).toFixed(1)}`).join("")}));
+    }
+    for (const s of options.series.filter(s => s.dots)) {      // dots after all lines, so no line crosses a dot
+      for (const p of s.points) {
+        if (p[0] === s.ring) root.append(svg("circle", {class: "ring", cx: sx(p[0]), cy: sy(p[1]), r: 8, stroke: s.color}));
+        root.append(svg("circle", {class: "dot", cx: sx(p[0]), cy: sy(p[1]), r: 5, fill: s.color}));
+      }
+    }
+    if (labels) {                        // a name at the end of each line; one that would cover another is left out
+      const placed = [];
+      for (const s of options.series) {
+        const [x, y] = s.points[s.points.length - 1].map((v, i) => i ? sy(v) : sx(v));
+        if (placed.some(p => Math.abs(p.y - y) < 15 && Math.abs(p.x - x) < 7 * longest + 14)) continue;
+        placed.push({x, y});
+        root.append(svg("text", {class: "end", x: x + 14, y: y + 4}, s.name));
+      }
+    }
+
+    const show = (i, px, py) => {
+      at = i;
+      const x = sx(stops[i]), box = root.getBoundingClientRect();
+      cross.setAttribute("x1", x); cross.setAttribute("x2", x); cross.setAttribute("visibility", "visible");
+      tooltip(options.title(stops[i]), rows(stops[i]), px ?? box.left + x * box.width / W, py ?? box.top + m.top);
+    };
+    const hide = () => { cross.setAttribute("visibility", "hidden"); $("tip").hidden = true; };
+    if (stops.length) {
+      root.addEventListener("pointermove", e => {
+        const box = root.getBoundingClientRect();
+        const x = x0 + ((e.clientX - box.left) * W / box.width - m.left) / (W - m.left - m.right) * (x1 - x0);
+        show(stops.reduce((nearest, stop, i) => Math.abs(stop - x) < Math.abs(stops[nearest] - x) ? i : nearest, 0), e.clientX, e.clientY);
+      });
+      root.addEventListener("pointerleave", hide);
+      root.addEventListener("focus", () => show(at ?? stops.length - 1));
+      root.addEventListener("blur", hide);
+      root.addEventListener("keydown", e => {
+        const move = {ArrowLeft: -1, ArrowRight: 1}[e.key];
+        if (!move) return;
+        e.preventDefault();
+        show(Math.max(0, Math.min(stops.length - 1, (at ?? 0) + move)));
+      });
+    }
+    host.replaceChildren(root);
+  }
+  // Called once when the observing starts, and again whenever the layout gives the chart another width.
+  new ResizeObserver(() => { if (host.clientWidth !== width) draw(); }).observe(host);
+}
+
+// --- Charts ---------------------------------------------------------------------------------------
+function werChart() {
+  const runs = D.runs.filter(run => run.evaluations.some(e => has(e.wer)));
+  if (!runs.length) { $("wer").hidden = true; return; }
+  $("wer-legend").append(...runs.map(run => el("span", null, key(run.color, true), run.name)));
+  lineChart($("wer-plot"), {
+    series: runs.map(run => ({name: run.name, color: run.color, dots: true, ring: run.best_epoch,
+                              points: run.evaluations.filter(e => has(e.wer)).map(e => [e.epoch, e.wer])})),
+    height: 340, labels: true, label: "WER on the validation split after every evaluation, one line per run",
+    tick: y => `${+y.toFixed(2)}%`, value: pct, title: x => `Epoch ${plain(x)}`,
+  });
+}
+
+function lossPanels() {
+  const runs = D.runs.filter(run => run.train.length || run.evaluations.length);
+  if (!runs.length) { $("loss").hidden = true; return; }
+  const validation = run => run.evaluations.filter(e => has(e.eval_loss));
+  const lastEpoch = Math.max(...runs.flatMap(run => [...run.train.map(p => p[0]), ...run.evaluations.map(e => e.epoch)]));
+  const highest = Math.max(...runs.flatMap(run => [...run.train.map(p => p[1]), ...validation(run).map(e => e.eval_loss)]));
+  for (const run of runs) {
+    const plot = el("div");
+    $("loss-panels").append(el("div", {class: "card chart"}, el("div", {class: "title"}, key(run.color, true), code(run.name)), plot));
+    lineChart(plot, {
+      series: [{name: "training loss", color: "var(--muted)", points: run.train},
+               {name: "validation loss", color: run.color, dots: true, points: validation(run).map(e => [e.epoch, e.eval_loss])}],
+      x: [0, lastEpoch], y: [0, highest], height: 240, label: `Training and validation loss of ${run.name}`,
+      tick: y => String(y), title: x => `Epoch ${plain(x)}`,
+      rows: x => {
+        const e = run.evaluations.find(e => e.epoch === x);
+        return [{color: run.color, dotted: true, value: loss(e.eval_loss), name: "validation loss"},
+                {color: "var(--muted)", value: loss(e.train_loss), name: "training loss, mean since the evaluation before"}];
+      },
+    });
+  }
+}
+
+// --- Table of all evaluations ---------------------------------------------------------------------
+function evaluationsTable() {
+  const rows = D.runs.flatMap(run => run.evaluations.map((e, i) => el("tr", {class: i === 0 && "first"},
+    td(i === 0 && [key(run.color, true), code(run.name)], "name"),
+    td(plain(e.epoch), "num"), td(String(e.step), "num"), td(loss(e.train_loss), "num"), td(loss(e.eval_loss), "num"),
+    td(e.epoch === run.best_epoch ? el("b", null, pct(e.wer)) : pct(e.wer), "num"), td(pct(e.cer), "num"))));
+  if (!rows.length) { $("evaluations").hidden = true; return; }
+  $("evaluations").append(table([th("Run"), th("Epoch", "num"), th("Step", "num"), th("Training loss", "num"),
+                                 th("Validation loss", "num"), th("WER ↓", "num"), th("CER ↓", "num")], rows));
+}
+
+// --- Page -----------------------------------------------------------------------------------------
+if (!D.runs.length) {
+  for (const section of document.querySelectorAll("section")) section.hidden = true;
+  $("empty").hidden = false;
+} else {
+  const models = [...new Set(D.runs.map(run => run.model).filter(has))];
+  $("meta").append(...[["Made", D.generated], ["Runs", `${D.runs.length} in ${D.runs_dir}/`],
+                       [models.length > 1 ? "Models" : "Model", models.join(", ")]]
+    .filter(pair => pair[1]).map(([name, value]) => el("span", null, el("b", null, name), ` ${value}`)));
+  if (D.runs.some(run => !run.settings_saved)) {
+    $("reading-list").append(el("li", null, "A run marked “settings read from configs/” was trained before train.py saved ",
+      code("settings.yaml"), " with the run. Its settings come from ", code("configs/"),
+      " as they are now, and are wrong if those files changed after the run."));
+  }
+  runsTable();
+  werChart();
+  lossPanels();
+  evaluationsTable();
+}
+</script>
+</body>
+</html>
