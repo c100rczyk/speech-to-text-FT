@@ -1,0 +1,5 @@
+# This parameter give possibility to train model, on larger batch, despite we dont
+# have memory to run training on higher batches. After each batch gradient is calculated,
+# but don't touch wages. After all X times, one actualization of wages is made based on
+# the mean gradient of all samples in those batches.
+gradient_accumulation_steps: 4
