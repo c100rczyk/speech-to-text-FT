@@ -1,7 +1,7 @@
 # Base configuration of a training run. train.py always reads this file first; an experiment file
 # (configs/experiments/*.yaml) repeats only the settings it changes.
 
-model: openai/whisper-small           # the model that is fine-tuned
+model: openai/whisper-tiny           # the model that is fine-tuned
 seed: 42
 
 # --- How long and how fast the model learns ---
