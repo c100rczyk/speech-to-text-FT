@@ -9,24 +9,35 @@ Fine-tunes Whisper on the synthetic conversations in data/training/.
 multiple_experiments.sh runs the last form for every file in configs/experiments/.
 
 The settings of a run come from configs/base.yaml. An experiment file repeats only the settings it changes.
-`model` is read by this script; every other key is an argument of Seq2SeqTrainingArguments under its own name,
-so any of them can be set in a config without a change here.
+Two keys are read by this script:
+    model   the Whisper model that is fine-tuned
+    lora    optional section. Without it all weights of the model are trained. With it the weights are frozen
+            and only LoRA adapters are trained; its keys are the arguments of peft.LoraConfig
+            (r, lora_alpha, target_modules, lora_dropout, ...).
+Every other key is an argument of Seq2SeqTrainingArguments under its own name, so any of them can be set
+in a config without a change here.
 
 Reads data/training/train/ and, when it exists, data/training/validation/. With a validation split the model
 is evaluated during training (WER, CER) and the checkpoint with the lowest WER wins.
 
 Writes to --output_dir (default: runs/<name of the config file>/ next to this script; kept out of git):
-    checkpoint-<step>/   the state at a save; only the last ones are kept
+    settings.yaml        the settings of this run: base.yaml with the changes of the experiment
+    checkpoint-<step>/   the state at a save; only the last ones are kept.
+                         With LoRA a checkpoint holds the adapters only, not the whole model.
     final/               the model after training, with its feature extractor and tokenizer:
-                         the best checkpoint when there is a validation split, otherwise the last one
+                         the best checkpoint when there is a validation split, otherwise the last one.
+                         With LoRA the adapters are merged into the weights, so final/ is a whole model here too.
 
 final/ can be evaluated on the test sets: evaluation/evaluate.py --model <path to final/>.
+summarize_runs.py puts all runs side by side on one page.
 """
 import argparse
 import dataclasses
 import sys
 from functools import partial
 from pathlib import Path
+
+from peft import LoraConfig, get_peft_model
 
 import numpy as np
 import torch
@@ -51,7 +62,8 @@ RUNS_DIR = PIPELINE_DIR / "runs"                            # results of a run, 
 
 
 def load_config(experiment=None):
-    """Settings of one run: configs/base.yaml, with the settings of the experiment file written over it."""
+    """Settings of one run: configs/base.yaml, with the settings of the experiment file written over it.
+    A section (`lora`) is written over as a whole, not key by key."""
     config = yaml.safe_load(BASE_CONFIG.read_text(encoding="utf-8")) or {}
     if experiment is not None:
         config.update(yaml.safe_load(Path(experiment).read_text(encoding="utf-8")) or {})
@@ -137,6 +149,21 @@ def prepare_batch(samples, decoder_start_id):
     return {"input_features": input_features, "labels": labels}
 
 
+def lora_configuration(settings):
+    """Settings of the `lora` section of a config -> LoraConfig: which layers get an adapter (target_modules),
+    how large an adapter is (r) and how strongly it acts (lora_alpha / r).
+    Every key has to be the name of one of its arguments.
+
+    task_type is not to be set: with SEQ_2_SEQ_LM peft passes input_ids to the model, as for a text model,
+    and the forward pass of Whisper stops with a TypeError.
+    """
+    unknown = sorted(set(settings) - {field.name for field in dataclasses.fields(LoraConfig)})
+    if unknown:
+        sys.exit(f"Config, lora: {', '.join(unknown)}: not a setting that can be given here "
+                 "(the arguments of peft.LoraConfig)")
+    return LoraConfig(**settings)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", help="experiment file: its settings replace those of configs/base.yaml "
@@ -148,9 +175,12 @@ def main():
     # --- Settings ---
     config = load_config(args.config)
     output_dir = Path(args.output_dir) if args.output_dir else RUNS_DIR / Path(args.config or BASE_CONFIG).stem
+    settings_text = yaml.safe_dump(config, sort_keys=False, allow_unicode=True)
     print(f"Settings of this run ({args.config or BASE_CONFIG}); results go to {output_dir}", flush=True)
-    print(yaml.safe_dump(config, sort_keys=False, allow_unicode=True), flush=True)
-    model_id = config.pop("model")          # everything that is left goes to Seq2SeqTrainingArguments
+    print(settings_text, flush=True)
+    model_id = config.pop("model")
+    lora = config.pop("lora", None)         # None: the config has no `lora` section, all weights are trained
+    # Everything that is left in config goes to Seq2SeqTrainingArguments.
 
     # --- Data ---
     # Synthetic conversations, one clip per turn (data/training/README.md describes the folder).
@@ -159,8 +189,14 @@ def main():
     # Evaluation during training needs the validation split (data/training/validation/).
     has_validation = "validation" in dataset
 
-    # Made before the long steps below, so that a wrong name in a config stops the run at once.
+    # Both are made before the long steps below, so that a wrong name in a config stops the run at once.
     training_args = training_arguments(config, output_dir, has_validation)
+    lora_config = lora_configuration(lora) if lora is not None else None
+
+    # The settings stay with the results: base.yaml changes between runs, and summarize_runs.py reads from here
+    # what each run was trained with.
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "settings.yaml").write_text(settings_text, encoding="utf-8")
 
     feature_extractor = WhisperFeatureExtractor.from_pretrained(model_id)
     tokenizer = WhisperTokenizer.from_pretrained(model_id, language="polish", task="transcribe")
@@ -182,6 +218,13 @@ def main():
     model.generation_config.task = "transcribe"
     model.generation_config.forced_decoder_ids = None
 
+    # --- LoRA ---
+    # The weights of the model are frozen. Every layer named in target_modules gets an adapter (two small
+    # matrices), and only the adapters are trained. The printed line says how many parameters that is.
+    if lora_config is not None:
+        model = get_peft_model(model, lora_config)
+        model.print_trainable_parameters()
+
     # --- Training ---
     # Trainer: joins the model, the data and the functions defined above, and runs the training loop.
     # It calls the two functions with one argument each, so the rest is bound here with partial.
@@ -200,6 +243,10 @@ def main():
 
     # The model that is in memory now: the best checkpoint with a validation split, otherwise the last state.
     final_dir = output_dir / "final"
+    if lora_config is not None:
+        # Every adapter is added into the weights of its layer, so final/ is a whole Whisper model, like after
+        # training all weights, and is loaded the same way. The adapters alone stay in checkpoint-<step>/.
+        trainer.model = trainer.model.merge_and_unload()
     trainer.save_model(str(final_dir))
     print(f"Model saved to {final_dir}", flush=True)
 
