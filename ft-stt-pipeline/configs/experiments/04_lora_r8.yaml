@@ -1,0 +1,6 @@
+learning_rate: 1.0e-3                 # LoRA needs a much higher rate
+lora:
+  r: 8
+  lora_alpha: 16
+  target_modules: [q_proj, v_proj]
+  lora_dropout: 0.1

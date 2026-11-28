@@ -1,0 +1,6 @@
+learning_rate: 1.0e-3
+lora:
+  r: 32
+  lora_alpha: 64
+  target_modules: [q_proj, v_proj]
+  lora_dropout: 0.1
