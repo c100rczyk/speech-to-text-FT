@@ -10,7 +10,16 @@ smaller batch size but not too small.
 + To which layers apply LORA:
   + Attention-only LORA significantly underperforms MLP-only LoRA
 
+And shorter article but with all important informations:
+huggingface.co/docs/peft/main/conceptual_guides/lora
+```
+Lora can be applied to any subset of weight matrices in a neural network to reduce
+the number of trainable parameters.
+```
 
+Hugging face article with more code. And this additionally this is training
+of audio model. So ideal example.
+https://huggingface.co/docs/peft/main/task_guides/int8-asr
 
 Whisper fine-tuning:
 https://huggingface.co/blog/fine-tune-whisper
